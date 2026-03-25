@@ -20,7 +20,17 @@ System tray app that monitors and manages the `MSFT-AzVPN-Manual` VPN connection
 | `Watch-VPN.ps1` | Original standalone monitor (retired — logic merged into tray) |
 | `Watch-VPN-Launcher.vbs` | Launcher for the retired monitor |
 
-## Scheduled Tasks
+## Setup
+
+Run once after cloning:
+
+```powershell
+.\vpn\Install.ps1
+```
+
+This registers the `VPN-Tray-Icon` scheduled task for the current user and starts it immediately.
+
+
 
 | Task | Trigger | Script |
 |------|---------|--------|
