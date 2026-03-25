@@ -1,7 +1,7 @@
 <#
 .SYNOPSIS
     System tray icon for MSFT-AzVPN-Manual.
-    Polls VPN state every 5s — reconnects automatically if disconnected and auto-reconnect is enabled.
+    Polls VPN state every 5s - reconnects automatically if disconnected and auto-reconnect is enabled.
     Icon: green = connected, red = disconnected.
     Left-click: connect+enable or disconnect+disable.
 #>
@@ -12,6 +12,8 @@ Add-Type -AssemblyName System.Drawing
 $VpnName     = "MSFT-AzVPN-Manual"
 $DisableFlag = Join-Path $PSScriptRoot "Watch-VPN.disabled"
 $LogFile     = Join-Path $PSScriptRoot "Watch-VPN.log"
+$ReconnectCooldownSecs = 30
+$script:lastReconnect  = [datetime]::MinValue
 
 function Write-Log([string]$msg) {
     Add-Content -Path $LogFile -Value ("[{0}] {1}" -f (Get-Date -Format "yyyy-MM-dd HH:mm:ss"), $msg)
@@ -24,8 +26,9 @@ function New-DotIcon([System.Drawing.Color]$color) {
     $g.FillEllipse((New-Object System.Drawing.SolidBrush($color)), 1, 1, 14, 14)
     $g.Dispose()
     $handle = $bmp.GetHicon()
+    $icon   = [System.Drawing.Icon]::FromHandle($handle)
     $bmp.Dispose()
-    return [System.Drawing.Icon]::FromHandle($handle)
+    return $icon
 }
 
 function Get-VpnConnected {
@@ -35,10 +38,10 @@ function Get-VpnConnected {
 
 function Update-Tray {
     if (Get-VpnConnected) {
-        $script:tray.Icon = New-DotIcon([System.Drawing.Color]::FromArgb(50, 200, 80))
+        $script:tray.Icon = $script:iconGreen
         $script:tray.Text = "MSFT-AzVPN-Manual: Connected"
     } else {
-        $script:tray.Icon = New-DotIcon([System.Drawing.Color]::FromArgb(210, 60, 60))
+        $script:tray.Icon = $script:iconRed
         $script:tray.Text = "MSFT-AzVPN-Manual: Disconnected"
     }
 }
@@ -51,6 +54,7 @@ function Invoke-Connect {
     $script:tray.BalloonTipText  = "Connecting..."
     $script:tray.BalloonTipIcon  = [System.Windows.Forms.ToolTipIcon]::Info
     $script:tray.ShowBalloonTip(2000)
+    $script:lastReconnect = Get-Date
     Write-Log "Manual connect requested."
 }
 
@@ -61,11 +65,14 @@ function Invoke-Disconnect {
     Write-Log "Manual disconnect requested. Auto-reconnect paused."
 }
 
+# Pre-create icons once - reused forever, no GDI leak
+$iconGreen = New-DotIcon([System.Drawing.Color]::FromArgb(50, 200, 80))
+$iconRed   = New-DotIcon([System.Drawing.Color]::FromArgb(210, 60, 60))
+
 # Build tray icon
 $tray         = New-Object System.Windows.Forms.NotifyIcon
 $tray.Visible = $true
 
-# Left-click: connect+enable or disconnect+disable
 $tray.Add_Click({
     if ($_.Button -eq [System.Windows.Forms.MouseButtons]::Left) {
         if (Get-VpnConnected) { Invoke-Disconnect } else { Invoke-Connect }
@@ -121,17 +128,22 @@ $menu.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator)) | Out-Null
 $menu.Items.Add($menuExit)       | Out-Null
 $tray.ContextMenuStrip = $menu
 
-# Set initial toggle label
 if (Test-Path $DisableFlag) { $menuToggle.Text = "Resume auto-reconnect" } else { $menuToggle.Text = "Pause auto-reconnect" }
 
-# Poll every 5s: update icon + auto-reconnect if needed
+# Poll every 5s: update icon + auto-reconnect with cooldown
 $pollTimer          = New-Object System.Windows.Forms.Timer
 $pollTimer.Interval = 5000
 $pollTimer.Add_Tick({
-    Update-Tray
-    if (-not (Test-Path $DisableFlag) -and -not (Get-VpnConnected)) {
-        Write-Log "VPN disconnected. Auto-reconnecting..."
-        Start-Process "rasdial.exe" -ArgumentList $VpnName -WindowStyle Hidden
+    try {
+        Update-Tray
+        $cooldownExpired = ((Get-Date) - $script:lastReconnect).TotalSeconds -ge $ReconnectCooldownSecs
+        if (-not (Test-Path $DisableFlag) -and -not (Get-VpnConnected) -and $cooldownExpired) {
+            Write-Log "VPN disconnected. Auto-reconnecting..."
+            Start-Process "rasdial.exe" -ArgumentList $VpnName -WindowStyle Hidden
+            $script:lastReconnect = Get-Date
+        }
+    } catch {
+        Write-Log "Poll error: $_"
     }
 })
 $pollTimer.Start()
