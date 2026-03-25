@@ -29,7 +29,7 @@ $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interac
 
 Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger `
     -Settings $settings -Principal $principal `
-    -Description "MSFT-AzVPN-Manual tray monitor — auto-reconnect + tray icon" | Out-Null
+    -Description "MSFT-AzVPN-Manual tray monitor - auto-reconnect + tray icon" | Out-Null
 
 Write-Host "Registered task '$taskName'." -ForegroundColor Green
 Write-Host "Starting now..."
