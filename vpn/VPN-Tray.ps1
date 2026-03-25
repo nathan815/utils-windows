@@ -10,8 +10,8 @@ Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
 $VpnName     = "MSFT-AzVPN-Manual"
-$DisableFlag = "C:\Users\johnsonn\utils\vpn\Watch-VPN.disabled"
-$LogFile     = "C:\Users\johnsonn\utils\vpn\Watch-VPN.log"
+$DisableFlag = Join-Path $PSScriptRoot "Watch-VPN.disabled"
+$LogFile     = Join-Path $PSScriptRoot "Watch-VPN.log"
 
 function Write-Log([string]$msg) {
     Add-Content -Path $LogFile -Value ("[{0}] {1}" -f (Get-Date -Format "yyyy-MM-dd HH:mm:ss"), $msg)

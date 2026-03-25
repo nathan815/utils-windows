@@ -4,7 +4,7 @@
 #>
 param([switch]$Enable, [switch]$Disable)
 
-$DisableFlag = "C:\Users\johnsonn\utils\vpn\Watch-VPN.disabled"
+$DisableFlag = Join-Path $PSScriptRoot "Watch-VPN.disabled"
 $currently   = Test-Path $DisableFlag
 
 if ($Enable -and -not $Disable)     { $turnOff = $false }
